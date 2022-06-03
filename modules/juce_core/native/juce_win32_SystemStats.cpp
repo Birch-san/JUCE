@@ -41,7 +41,7 @@ void Logger::outputDebugString (const String& text)
 
 //==============================================================================
 
-#if JUCE_MINGW || JUCE_CLANG
+#if JUCE_INTEL && (JUCE_MINGW || JUCE_CLANG)
 static void callCPUID (int result[4], uint32 type)
 {
   uint32 la = (uint32) result[0], lb = (uint32) result[1],
@@ -68,6 +68,12 @@ static void callCPUID (int result[4], int infoType)
 
 String SystemStats::getCpuVendor()
 {
+#ifndef JUCE_INTEL
+    jassertfalse;
+    // we've only implemented a meaningful callCPUID for Intel.
+    return {};
+#endif
+
     int info[4] = { 0 };
     callCPUID (info, 0);
 
@@ -81,6 +87,11 @@ String SystemStats::getCpuVendor()
 
 String SystemStats::getCpuModel()
 {
+#ifndef JUCE_INTEL
+    jassertfalse;
+    // we've only implemented a meaningful callCPUID for Intel.
+    return {};
+#endif
     char name[65] = { 0 };
     int info[4] = { 0 };
 
@@ -133,6 +144,7 @@ static int findNumberOfPhysicalCores() noexcept
 //==============================================================================
 void CPUInformation::initialise() noexcept
 {
+#if JUCE_INTEL
     int info[4] = { 0 };
     callCPUID (info, 1);
 
@@ -167,6 +179,7 @@ void CPUInformation::initialise() noexcept
     hasAVX512VL        = ((unsigned int) info[1] & (1u << 31)) != 0;
     hasAVX512VBMI      = ((unsigned int) info[2] & (1u <<  1)) != 0;
     hasAVX512VPOPCNTDQ = ((unsigned int) info[2] & (1u << 14)) != 0;
+#endif // JUCE_INTEL
 
     SYSTEM_INFO systemInfo;
     GetNativeSystemInfo (&systemInfo);
@@ -440,7 +453,7 @@ static int64 juce_getClockCycleCounter() noexcept
     // MS intrinsics version...
     return (int64) __rdtsc();
 
-   #elif JUCE_GCC || JUCE_CLANG
+   #elif JUCE_INTEL && (JUCE_GCC || JUCE_CLANG)
     // GNU inline asm version...
     unsigned int hi = 0, lo = 0;
 
@@ -456,6 +469,21 @@ static int64 juce_getClockCycleCounter() noexcept
          : "cc", "eax", "ebx", "ecx", "edx", "memory");
 
     return (int64) ((((uint64) hi) << 32) | lo);
+   #elif JUCE_ARM && JUCE_64BIT
+    {
+        // SPDX-License-Identifier: GPL-2.0
+        // https://stackoverflow.com/a/67968296/5257399
+        uint64 cycles;
+        /*
+         * According to ARM DDI 0487F.c, from Armv8.0 to Armv8.5 inclusive, the
+         * system counter is at least 56 bits wide; from Armv8.6, the counter
+         * must be 64 bits wide.  So the system counter could be less than 64
+         * bits wide and it is attributed with the flag 'cap_user_time_short'
+         * is true.
+         */
+        asm volatile("mrs %0, cntvct_el0" : "=r" (cycles));
+        return static_cast<int64>(cycles);
+    }
    #else
     #error "unknown compiler?"
    #endif
