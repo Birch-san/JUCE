@@ -343,11 +343,11 @@ function(_juce_create_pkgconfig_target prefix)
     set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/Modules/")
 
     find_package(PkgConfig REQUIRED)
-    pkg_check_modules(${prefix} IMPORTED_TARGET STATIC_TARGET ${ARGN})
-    set(tgt "PkgConfig::${prefix}")
+    pkg_check_modules(pkgconfig_${prefix} IMPORTED_TARGET STATIC_TARGET ${ARGN})
 
-    add_library(juce::pkgconfig_${prefix} ALIAS ${tgt})
-    install(TARGETS ${tgt} EXPORT JUCE)
+    add_library(pkgconfig_${prefix} INTERFACE)
+    add_library(juce::pkgconfig_${prefix} ALIAS pkgconfig_${prefix})
+    install(TARGETS pkgconfig_${prefix} EXPORT JUCE)
 endfunction()
 
 # ==================================================================================================
