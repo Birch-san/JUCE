@@ -331,7 +331,8 @@ endfunction()
 # ==================================================================================================
 
 function(_juce_create_pkgconfig_target prefix)
-    if(TARGET juce::pkgconfig_${prefix})
+    set(namespaced_prefix juce::pkgconfig_${prefix})
+    if(TARGET ${namespaced_prefix})
         return()
     endif()
 
@@ -345,9 +346,10 @@ function(_juce_create_pkgconfig_target prefix)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(${prefix} IMPORTED_TARGET STATIC_TARGET ${ARGN})
     set(tgt PkgConfig::${prefix})
-
-    add_library(juce::pkgconfig_${prefix} ALIAS ${tgt})
-    install(TARGETS ${tgt} EXPORT JUCE)
+    if(TARGET ${tgt})
+        add_library(${namespaced_prefix} ALIAS ${tgt})
+        install(TARGETS ${tgt} EXPORT JUCE)
+    endif()
 endfunction()
 
 # ==================================================================================================
@@ -546,8 +548,12 @@ function(juce_add_module module_path)
         _juce_get_metadata("${metadata_dict}" linuxPackages module_linuxpackages)
 
         if(module_linuxpackages)
-            _juce_create_pkgconfig_target(${module_name}_LINUX_DEPS ${module_linuxpackages})
-            target_link_libraries(${module_name} INTERFACE juce::pkgconfig_${module_name}_LINUX_DEPS)
+            set(prefix ${module_name}_LINUX_DEPS)
+            _juce_create_pkgconfig_target(${prefix} ${module_linuxpackages})
+            set(namespaced_prefix juce::pkgconfig_${prefix})
+            if(TARGET ${namespaced_prefix})
+                target_link_libraries(${module_name} INTERFACE ${namespaced_prefix})
+            endif()
         endif()
 
         _juce_link_libs_from_metadata("${module_name}" "${metadata_dict}" linuxLibs)
