@@ -35,10 +35,6 @@
 include_guard(GLOBAL)
 cmake_minimum_required(VERSION 3.15)
 
-# use newer FindPkgConfig for improved support for static linking
-# this helps with statically-linking libfreetype on Linux, for juce_graphics module
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/Modules/")
-
 # ==================================================================================================
 
 set(JUCE_CMAKE_UTILS_DIR ${CMAKE_CURRENT_LIST_DIR}
@@ -338,6 +334,13 @@ function(_juce_create_pkgconfig_target name)
     if(TARGET juce::pkgconfig_${name})
         return()
     endif()
+
+    # use latest FindPkgConfig from very new CMake (nightly 20220521.
+    # don't yet see it in 3.22 release stream; maybe newer than that)
+    # for improved support for static linking
+    # this helps with statically-linking libfreetype on Linux, for juce_graphics module
+    # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/7070
+    set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/Modules/")
 
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(${name} STATIC_TARGET ${ARGN})
