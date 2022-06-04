@@ -344,8 +344,6 @@ function(_juce_create_pkgconfig_target prefix)
 
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(pkgconfig_${prefix} IMPORTED_TARGET STATIC_TARGET ${ARGN})
-
-    add_library(pkgconfig_${prefix} INTERFACE)
     add_library(juce::pkgconfig_${prefix} ALIAS pkgconfig_${prefix})
     install(TARGETS pkgconfig_${prefix} EXPORT JUCE)
 endfunction()
