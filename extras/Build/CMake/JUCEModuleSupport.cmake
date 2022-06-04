@@ -35,6 +35,10 @@
 include_guard(GLOBAL)
 cmake_minimum_required(VERSION 3.15)
 
+# use newer FindPkgConfig for improved support for static linking
+# this helps with statically-linking libfreetype on Linux, for juce_graphics module
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/Modules/")
+
 # ==================================================================================================
 
 set(JUCE_CMAKE_UTILS_DIR ${CMAKE_CURRENT_LIST_DIR}
@@ -336,7 +340,7 @@ function(_juce_create_pkgconfig_target name)
     endif()
 
     find_package(PkgConfig REQUIRED)
-    pkg_check_modules(${name} ${ARGN})
+    pkg_check_modules(${name} STATIC_TARGET ${ARGN})
 
     add_library(pkgconfig_${name} INTERFACE)
     add_library(juce::pkgconfig_${name} ALIAS pkgconfig_${name})
@@ -344,8 +348,8 @@ function(_juce_create_pkgconfig_target name)
 
     set(pairs
         "INCLUDE_DIRECTORIES\;INCLUDE_DIRS"
-        "LINK_LIBRARIES\;LINK_LIBRARIES"
-        "LINK_OPTIONS\;LDFLAGS_OTHER"
+        "LINK_LIBRARIES\;STATIC_LINK_LIBRARIES"
+        "LINK_OPTIONS\;STATIC_LDFLAGS_OTHER"
         "COMPILE_OPTIONS\;CFLAGS_OTHER")
 
     foreach(pair IN LISTS pairs)
