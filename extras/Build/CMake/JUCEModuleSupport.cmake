@@ -350,10 +350,10 @@ function(_juce_create_pkgconfig_target name)
     install(TARGETS pkgconfig_${name} EXPORT JUCE)
 
     set(pairs
-        "INCLUDE_DIRECTORIES\;INCLUDE_DIRS"
+        "INCLUDE_DIRECTORIES\;STATIC_INCLUDE_DIRS"
         "LINK_LIBRARIES\;STATIC_LINK_LIBRARIES"
         "LINK_OPTIONS\;STATIC_LDFLAGS_OTHER"
-        "COMPILE_OPTIONS\;CFLAGS_OTHER")
+        "COMPILE_OPTIONS\;STATIC_CFLAGS_OTHER")
 
     foreach(pair IN LISTS pairs)
         list(GET pair 0 key)
