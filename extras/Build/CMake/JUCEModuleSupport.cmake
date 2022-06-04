@@ -330,8 +330,8 @@ endfunction()
 
 # ==================================================================================================
 
-function(_juce_create_pkgconfig_target name)
-    if(TARGET juce::pkgconfig_${name})
+function(_juce_create_pkgconfig_target prefix)
+    if(TARGET juce::pkgconfig_${prefix})
         return()
     endif()
 
@@ -343,26 +343,11 @@ function(_juce_create_pkgconfig_target name)
     set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/Modules/")
 
     find_package(PkgConfig REQUIRED)
-    pkg_check_modules(${name} STATIC_TARGET ${ARGN})
+    pkg_check_modules(${prefix} IMPORTED_TARGET STATIC_TARGET ${ARGN})
+    set(tgt "PkgConfig::${prefix}")
 
-    add_library(pkgconfig_${name} INTERFACE)
-    add_library(juce::pkgconfig_${name} ALIAS pkgconfig_${name})
-    install(TARGETS pkgconfig_${name} EXPORT JUCE)
-
-    set(pairs
-        "INCLUDE_DIRECTORIES\;STATIC_INCLUDE_DIRS"
-        "LINK_LIBRARIES\;STATIC_LINK_LIBRARIES"
-        "LINK_OPTIONS\;STATIC_LDFLAGS_OTHER"
-        "COMPILE_OPTIONS\;STATIC_CFLAGS_OTHER")
-
-    foreach(pair IN LISTS pairs)
-        list(GET pair 0 key)
-        list(GET pair 1 value)
-
-        if(${name}_${value})
-            set_target_properties(pkgconfig_${name} PROPERTIES INTERFACE_${key} "${${name}_${value}}")
-        endif()
-    endforeach()
+    add_library(juce::pkgconfig_${prefix} ALIAS ${tgt})
+    install(TARGETS ${tgt} EXPORT JUCE)
 endfunction()
 
 # ==================================================================================================
