@@ -62,7 +62,12 @@ static void callCPUID (int result[4], uint32 type)
 #else
 static void callCPUID (int result[4], int infoType)
 {
+#if JUCE_INTEL
     __cpuid (result, infoType);
+#else
+    // we've only implemented a meaningful __cpuid for Intel.
+    jassertfalse;
+#endif
 }
 #endif
 
