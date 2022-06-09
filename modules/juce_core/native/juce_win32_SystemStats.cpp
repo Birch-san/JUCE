@@ -20,6 +20,27 @@
   ==============================================================================
 */
 
+// on ARM, CPU info is hidden behind privileged access.
+// the *only* way we can get CPU info is via platform APIs.
+// this is known to work in MinGW, but these are OS headers
+// so should be available generally.
+#ifdef JUCE_ARM
+// required to parse winnt.h; defines macros like CONST
+#include <minwindef.h>
+// required for CPU feature-detection; defines PF_AVX_INSTRUCTIONS_AVAILABLE
+// this is a pretty heavy header just for the sake of grabbing a number,
+// and it looks like we may be the only file in the compilation unit that asks for it.
+// if this is a concern: consider duplicating the constants ourselves.
+#include <winnt.h>
+// defines IsProcessorFeaturePresent
+#include <processthreadsapi.h>
+#endif // JUCE_ARM
+
+#ifdef JUCE_MINGW
+// defines GetNativeSystemInfo, GetLogicalProcessorInformation
+#include <sysinfoapi.h>
+#endif
+
 namespace juce
 {
 
@@ -73,11 +94,16 @@ static void callCPUID (int result[4], int infoType)
 
 String SystemStats::getCpuVendor()
 {
-#ifndef JUCE_INTEL
-    jassertfalse;
-    // we've only implemented a meaningful callCPUID for Intel.
+#ifdef JUCE_ARM
+    // https://stackoverflow.com/a/64867034/5257399
+    // there are instructions to lookup CPU vendor on ARM, but they require
+    // privileged access.
+    // https://docs.microsoft.com/en-us/previous-versions/aa911521(v=msdn.10)
+    // https://docs.microsoft.com/en-us/windows/win32/api/sysinfoapi/ns-sysinfoapi-system_info
+    // with GetNativeSystemInfo we can determine processor level and revision,
+    // but they're not meaningful without knowing the vendor.
     return {};
-#endif
+#elif JUCE_INTEL
 
     int info[4] = { 0 };
     callCPUID (info, 0);
@@ -88,15 +114,26 @@ String SystemStats::getCpuVendor()
     memcpy (v + 8, info + 2, 4);
 
     return String (v, 12);
+#else
+    // not implemented for non-Intel. but unlike ARM, it *might* be possible
+    // to implement, so raise an assertion during development.
+    jassertfalse;
+    return {};
+#endif
 }
 
 String SystemStats::getCpuModel()
 {
-#ifndef JUCE_INTEL
-    jassertfalse;
-    // we've only implemented a meaningful callCPUID for Intel.
+#ifdef JUCE_ARM
+    // https://stackoverflow.com/a/64867034/5257399
+    // there are instructions to lookup CPU model on ARM, but they require
+    // privileged access.
+    // https://docs.microsoft.com/en-us/previous-versions/aa911521(v=msdn.10)
+    // https://docs.microsoft.com/en-us/windows/win32/api/sysinfoapi/ns-sysinfoapi-system_info
+    // with GetNativeSystemInfo we can determine processor level and revision,
+    // but they're not meaningful without knowing the vendor.
     return {};
-#endif
+#elif JUCE_INTEL
     char name[65] = { 0 };
     int info[4] = { 0 };
 
@@ -117,17 +154,16 @@ String SystemStats::getCpuModel()
     memcpy (name + 32, info, sizeof (info));
 
     return String (name).trim();
+#else
+    // not implemented for non-Intel. but unlike ARM, it *might* be possible
+    // to implement, so raise an assertion during development.
+    jassertfalse;
+    return {};
+#endif
 }
 
 static int findNumberOfPhysicalCores() noexcept
 {
-   #if JUCE_MINGW
-    // Not implemented in MinGW
-    jassertfalse;
-
-    return 1;
-   #else
-
     int numPhysicalCores = 0;
     DWORD bufferSize = 0;
     GetLogicalProcessorInformation (nullptr, &bufferSize);
@@ -143,7 +179,6 @@ static int findNumberOfPhysicalCores() noexcept
     }
 
     return numPhysicalCores;
-   #endif // JUCE_MINGW
 }
 
 //==============================================================================
@@ -184,6 +219,25 @@ void CPUInformation::initialise() noexcept
     hasAVX512VL        = ((unsigned int) info[1] & (1u << 31)) != 0;
     hasAVX512VBMI      = ((unsigned int) info[2] & (1u <<  1)) != 0;
     hasAVX512VPOPCNTDQ = ((unsigned int) info[2] & (1u << 14)) != 0;
+#elif JUCE_ARM
+    // on ARM, the registers describing CPU capabilities require privileged
+    // access. and __cpuid doesn't give the same details as it does on x86.
+    // win32 API calls are our only option.
+    // https://docs.microsoft.com/en-gb/windows/win32/api/processthreadsapi/nf-processthreadsapi-isprocessorfeaturepresent
+    // https://github.com/mingw-w64/mingw-w64/blob/master/mingw-w64-headers/include/winnt.h
+    hasMMX = IsProcessorFeaturePresent(PF_MMX_INSTRUCTIONS_AVAILABLE);
+    hasSSE = IsProcessorFeaturePresent(PF_XMMI_INSTRUCTIONS_AVAILABLE);
+    hasSSE2 = IsProcessorFeaturePresent(PF_XMMI64_INSTRUCTIONS_AVAILABLE);
+    hasSSE3 = IsProcessorFeaturePresent(PF_SSE3_INSTRUCTIONS_AVAILABLE);
+    hasAVX = IsProcessorFeaturePresent(PF_AVX_INSTRUCTIONS_AVAILABLE);
+    hasSSSE3 = IsProcessorFeaturePresent(PF_SSSE3_INSTRUCTIONS_AVAILABLE);
+    hasSSE41 = IsProcessorFeaturePresent(PF_SSE4_1_INSTRUCTIONS_AVAILABLE);
+    hasSSE42 = IsProcessorFeaturePresent(PF_SSE4_2_INSTRUCTIONS_AVAILABLE);
+    has3DNow = IsProcessorFeaturePresent(PF_3DNOW_INSTRUCTIONS_AVAILABLE);
+    hasAVX2 = IsProcessorFeaturePresent(PF_AVX2_INSTRUCTIONS_AVAILABLE);
+    hasAVX512F = IsProcessorFeaturePresent(PF_AVX512F_INSTRUCTIONS_AVAILABLE);
+    // I didn't see any way to detect FMA3, FMA4 or the rest of the AVX
+    // capabilities but they sounds x86-specific anyway.
 #endif // JUCE_INTEL
 
     SYSTEM_INFO systemInfo;
@@ -475,6 +529,7 @@ static int64 juce_getClockCycleCounter() noexcept
 
     return (int64) ((((uint64) hi) << 32) | lo);
    #elif JUCE_ARM && JUCE_64BIT
+    // can't use MinGW __rdtsc() intrinsic -- uses assembly which doesn't work on ARM
     {
         // SPDX-License-Identifier: GPL-2.0
         // https://stackoverflow.com/a/67968296/5257399

@@ -22,6 +22,11 @@
 
 #pragma once
 
+#if JUCE_MINGW
+  // provides __debugbreak() intrinsic
+  #include <intrin.h>
+#endif
+
 namespace juce
 {
 
@@ -66,21 +71,19 @@ namespace juce
       @see jassert()
   */
   #define JUCE_BREAK_IN_DEBUGGER        { ::kill (0, SIGTRAP); }
-#elif JUCE_MSVC
-  #ifndef __INTEL_COMPILER
+#elif JUCE_MSVC || JUCE_MINGW
+  #if !defined(__INTEL_COMPILER) && !defined(JUCE_MINGW)
     #pragma intrinsic (__debugbreak)
   #endif
   #define JUCE_BREAK_IN_DEBUGGER        { __debugbreak(); }
-#elif JUCE_INTEL && (JUCE_GCC || JUCE_CLANG || JUCE_MAC)
-  #if JUCE_NO_INLINE_ASM
-   #define JUCE_BREAK_IN_DEBUGGER       { }
-  #else
-   #define JUCE_BREAK_IN_DEBUGGER       { asm ("int $3"); }
-  #endif
+#elif JUCE_INTEL && (JUCE_GCC || JUCE_CLANG || JUCE_MAC) && !JUCE_NO_INLINE_ASM
+  #define JUCE_BREAK_IN_DEBUGGER       { asm ("int $3"); }
 #elif JUCE_ARM && JUCE_MAC
   #define JUCE_BREAK_IN_DEBUGGER        { __builtin_debugtrap(); }
 #elif JUCE_ANDROID
   #define JUCE_BREAK_IN_DEBUGGER        { __builtin_trap(); }
+#elif JUCE_NO_INLINE_ASM
+  #define JUCE_BREAK_IN_DEBUGGER        { }
 #else
   #define JUCE_BREAK_IN_DEBUGGER        { __asm int 3 }
 #endif
