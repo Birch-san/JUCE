@@ -320,8 +320,9 @@ SystemStats::OperatingSystemType SystemStats::getOperatingSystemType()
     auto minor = versionInfo.dwMinorVersion;
    #endif
 
-    jassert (major <= 10); // need to add support for new version!
+    jassert (major <= 11);
 
+    if (major == 11)                 return Windows11;
     if (major == 10)                 return Windows10;
     if (major == 6 && minor == 3)    return Windows8_1;
     if (major == 6 && minor == 2)    return Windows8_0;
@@ -340,6 +341,7 @@ String SystemStats::getOperatingSystemName()
 
     switch (getOperatingSystemType())
     {
+        case Windows11:         name = "Windows 11";        break;
         case Windows10:         name = "Windows 10";        break;
         case Windows8_1:        name = "Windows 8.1";       break;
         case Windows8_0:        name = "Windows 8.0";       break;
